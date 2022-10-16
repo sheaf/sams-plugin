@@ -1,0 +1,94 @@
+cabal-version:   3.0
+name:            sams-plugin
+version:         0.0.1.0
+synopsis:        A type-checking plugin that provides instances for optics
+category:        ghc, plugin, optics, deriving
+author:          Sam Derbyshire
+maintainer:      sam.derbyshire@gmail.com
+license:         BSD-3-Clause
+build-type:      Simple
+extra-doc-files: readme.md
+description:
+  This is a demonstration of how to use a type-checking plugin
+  to generate derived instances (in this case, for some 'GetField'/'SetField'
+  typeclasses).
+
+  Using @-XDerivingVia@, one can declare a datatype and derive instances
+  using the plugin, using the following syntax:
+
+    @@@
+      data D ...
+        deriving Sam'sOptics via Sam'sPlugin
+    @@@
+
+  The type-checking plugin will then get triggered and generate
+  'Sam'sGetField' and 'Sam'sSetField' instances for all the fields of the
+  datatype.
+
+  This is simply a proof of concept. It would be preferable to implement
+  deriving plugins in GHC, to avoid some of the shortcomings of the current
+  approach. See the readme for more information.
+
+common common
+
+  build-depends:
+        base
+          >= 4.13 && < 4.17
+
+  default-language:
+    Haskell2010
+
+  default-extensions:
+    BangPatterns,
+    BlockArguments,
+    DataKinds,
+    FunctionalDependencies,
+    MagicHash,
+    NoStarIsType,
+    PatternSynonyms,
+    RankNTypes,
+    RecordWildCards,
+    StandaloneKindSignatures,
+    TupleSections,
+    TypeApplications
+
+  ghc-options:
+    -Wall
+    -Wcompat
+    -fno-warn-orphans
+    -fno-warn-unticked-promoted-constructors
+    -fno-warn-unused-do-bind
+    -fwarn-missing-local-signatures
+    -fwarn-incomplete-uni-patterns
+    -fwarn-missing-deriving-strategies
+
+library
+
+    import:
+        common
+
+    hs-source-dirs:
+        plugin
+
+    exposed-modules:
+        Sam'sOptics,
+        Sam'sPlugin
+
+    build-depends:
+        ghc
+      , ghc-tcplugin-api
+
+library sams-examples
+
+    import:
+        common
+
+    hs-source-dirs:
+        examples
+
+    exposed-modules:
+        Example1A,
+        Example1B
+
+    build-depends:
+        sams-plugin
