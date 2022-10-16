@@ -2,7 +2,9 @@
 # Sam's "deriving" typechecking plugin
 
 This library implements a proof-of-concept typechecking plugin that
-derives instances.  
+derives instances. In essence, it extends the deriving mechanism
+with custom deriving strategies.  
+
 For demonstration purposes, the plugin implements some optics:
 
 ```haskell
@@ -13,12 +15,12 @@ data D a = MkD { fld1 :: a, fld2 :: Int# }
   deriving Sam'sOptics via Sam'sPlugin
 ```
 
-This will derive 'Sam'sHasField' and 'Sam'sGetField' instances for each of
+This will derive `Sam'sHasField` and `Sam'sGetField` instances for each of
 the individual fields of the data type `D`. So we can then typecheck:
 
 ```haskell
-foo :: D Char -> Char
-foo = sam'sGetField @"fld1"
+foo :: Char -> D Char -> D Char
+foo = sam'sSetField @"fld1"
 
 bar :: D a -> Int#
 bar = sam'sGetField @"fld2"
@@ -44,18 +46,21 @@ limitations.
   employed in his `DeriveLift` plugin.
 - The plugin doesn't play nicely with GHCi, so reloading a module might cause
   duplicate instances to be added to the instance environment.
+- It is possible to trigger strange behaviour by making use of the
+  `Sam'sOptics` typeclass in locations other than deriving clauses, e.g.
+  by adding it as a superclass of a user-defined typeclass.
 
-### Limitations of this optics-related plugin
+### Limitations of the optics-related deriving mechanism
 
-The plugin I implemented for optics only handles simple cases, as this aspect
-isn't the part of the implementation I was interested in exploring.
-So it has some rather strong limitations:
+The deriving strategy I implemented for optics only handles simple cases, as
+this aspect isn't the part of the implementation I was interested in exploring.  
+As a result, it has some rather strong limitations:
 
-- Only handles data types with a single constructor.
+- It only handles data types with a single constructor.  
   (Expect a custom type error telling you so.)
-- Doesn't handle datatypes with existentials, or GADTs.
-  (Expect random crashes, as I haven't implemented a check preventing you
-  from attempting this.)
+- It doesn't handle datatypes with existentials, or GADTs.  
+  (Expect the plugin to silently generate incorrect Core, as I haven't
+  implemented any checks preventing you from attempting this.)
 
 Note however that it **does** handle unboxed types: both the field types and
 the overall record type are allowed to be unboxed types.
@@ -63,17 +68,27 @@ the overall record type are allowed to be unboxed types.
 ## How it works
 
 Internally, the `Sam'sOptics` typeclass has a superclass `GenerateSam'sOptics`.
-When the user writes a deriving clause as above, he usual `deriving-via`
+When the user writes a deriving clause as above, the usual `deriving-via`
 mechanism will emit a `GenerateSam'sOptics` Wanted constraint because of this
 superclass. The constraint solver plugin then picks up this constraint and takes
 it as a signal to generate instances. It generates the evidence by generating
-Core directly, and adds this to an `IORef`. At the end of typechecking the
-module, we then add these instances to the instance environment and their
-evidence to the module's bindings, using a "typecheck result action" plugin.
+Core directly, adding the instances and their associated dictionary functions
+to an `IORef`. At the end of typechecking the module, we add these instances to
+the instance environment, and add the corresponding evidence bindings to the
+module's bindings, using a "typecheck result action" plugin.
 
 ## Why did you do this?
 
-This answers a challenge posed to me by Iceland Jack. I think it points to the
-necessity of implement "deriving plugins" in GHC, to avoid the complexities
-incurred by trying to implement all of this in a typechecking plugin, and
-to limitations inherent to the approach.
+This answers a challenge posed to me by Iceland Jack, who asked me whether I
+could implement a version of Taylor Fausak's [`evoke`](https://hackage.haskell.org/package/evoke)
+library, using a typechecker plugin instead of a source plugin.
+
+Using a typechecker plugin circumvents one limitation of `evoke`, which is that
+it operates on source Haskell syntax, instead of handling types directly.
+
+Unlike Taylor Fausak's library, this is only a basic proof-of-concept, not a
+usable library.  
+The conclusion I draw from this experiment is that a robust solution would
+require implementing "deriving plugins" in GHC, so that one can hook directly
+into the right place in GHC to generate instances instead of having to mess
+with the typechecker environment in inopportune places.
